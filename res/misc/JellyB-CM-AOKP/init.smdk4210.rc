@@ -39,11 +39,15 @@ on fs
     mount ext4 /res/dev/system /system noatime wait
 
 # Check and mount /cache
+    exec sfsck /res/dev/cache ext4
     mount ext4 /res/dev/cache /cache nosuid nodev noatime wait
+    exec sfsck /res/dev/data ext4
     mount ext4 /res/dev/data /data nosuid nodev noatime wait noauto_da_alloc
+    exec sfsck /dev/block/mmcblk0p12 ext4
     mount ext4 /dev/block/mmcblk0p12 /preload nosuid nodev noatime wait
-
+    exec sfsck /dev/block/mmcblk0p1 ext4
     mount ext4 /dev/block/mmcblk0p1 /efs nosuid nodev noatime wait
+
     mkdir /efs/bluetooth
     mkdir /efs/wifi
     chown radio system /efs/bluetooth
@@ -56,9 +60,6 @@ on fs
     chmod 0770 /data/misc/wifi 
 
 on post-fs-data
-# MDNS
-    socket mdns stream 0660 root system
-
 # GPS
     chown root system /dev/ttySAC1
     chmod 0660 /dev/ttySAC1
@@ -307,8 +308,6 @@ on post-fs-data
     setprop vold.post_fs_data_done 1
 
 on boot
-    mount debugfs /sys/kernel/debug /sys/kernel/debug
-
     setprop ro.radio.noril yes
 
 # permissions for NFC

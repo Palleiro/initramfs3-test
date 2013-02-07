@@ -1,6 +1,6 @@
 #!/sbin/busybox sh
 
-BB="/sbin/busybox";
+BB=/sbin/busybox
 
 # first mod the partitions then boot
 $BB sh /sbin/ext/system_tune_on_init.sh;
@@ -12,6 +12,11 @@ done;
 
 if [ ! -d /data/.siyah ]; then
 	$BB mkdir -p /data/.siyah;
+fi;
+
+# reset config-backup-restore
+if [ -f /data/.siyah/restore_running ]; then
+	rm -f /data/.siyah/restore_running;
 fi;
 
 ccxmlsum=`md5sum /res/customconfig/customconfig.xml | awk '{print $1}'`
@@ -26,13 +31,13 @@ fi;
 [ ! -f /data/.siyah/extreme_performance.profile ] && cp -a /res/customconfig/extreme_performance.profile /data/.siyah/extreme_performance.profile;
 [ ! -f /data/.siyah/extreme_battery.profile ] && cp -a /res/customconfig/extreme_battery.profile /data/.siyah/extreme_battery.profile;
 
-$BB chmod 0777 /data/.siyah/ -R;
+$BB chmod -R 0777 /data/.siyah/;
 
 . /res/customconfig/customconfig-helper;
 read_defaults;
 read_config;
 
-#mdnie sharpness tweak
+# mdnie sharpness tweak
 if [ "$mdniemod" == "on" ]; then
 	. /sbin/ext/mdnie-sharpness-tweak.sh;
 fi;
@@ -42,21 +47,31 @@ echo "on" > /sys/devices/virtual/misc/second_core/hotplug_on;
 echo "off" > /sys/devices/virtual/misc/second_core/second_core_on;
 
 # oom and mem perm fix
-chmod 777 /sys/module/lowmemorykiller/parameters/cost;
-chmod 777 /proc/sys/vm/mmap_min_addr;
+$BB chmod 777 /sys/module/lowmemorykiller/parameters/cost;
+$BB chmod 777 /proc/sys/vm/mmap_min_addr;
+
+# some nice thing for dev
+$BB ln -s /sys/devices/system/cpu/cpu0/cpufreq /cpufreq;
+$BB ln -s /sys/devices/system/cpu/cpufreq/ /cpugov;
 
 # Cortex parent should be ROOT/INIT and not STweaks
 nohup /sbin/ext/cortexbrain-tune.sh; 
+
+# create init.d folder if missing
+if [ ! -d /system/etc/init.d ]; then
+	mkdir /system/etc/init.d/
+	$BB chmod -R 755 /system/etc/init.d/;
+fi;
 
 (
 	PROFILE=`cat /data/.siyah/.active.profile`;
 	. /data/.siyah/$PROFILE.profile;
 
 	MIUI_JB=0;
-	[ "`/sbin/busybox grep -i cMIUI /system/build.prop`" ] && MIUI_JB=1;
+	[ "`$BB grep -i cMIUI /system/build.prop`" ] && MIUI_JB=1;
 
 	if [ $init_d == on ] || [ "$MIUI_JB" == 1 ]; then
-		/sbin/busybox sh /sbin/ext/run-init-scripts.sh;
+		$BB sh /sbin/ext/run-init-scripts.sh;
 	fi;
 )&
 
@@ -89,6 +104,8 @@ $BB chmod -R 755 /lib;
 	$BB insmod /lib/modules/usbserial.ko;
 	$BB insmod /lib/modules/ftdi_sio.ko;
 	$BB insmod /lib/modules/pl2303.ko;
+	$BB insmod /lib/modules/usbnet.ko;
+	$BB insmod /lib/modules/asix.ko;
 	$BB insmod /lib/modules/cifs.ko;
 )&
 
@@ -97,7 +114,7 @@ echo "0" > /sys/module/cpuidle_exynos4/parameters/log_en;
 
 # for ntfs automounting
 mkdir /mnt/ntfs;
-chmod 777 /mnt/ntfs/ -R;
+$BB chmod -R 777 /mnt/ntfs/;
 mount -t tmpfs -o mode=0777,gid=1000 tmpfs /mnt/ntfs
 
 $BB sh /sbin/ext/properties.sh;
@@ -117,10 +134,10 @@ echo "0" > /proc/sys/kernel/kptr_restrict;
 (
 	# Stop uci.sh from running all the PUSH Buttons in stweaks on boot.
 	$BB mount -o remount,rw rootfs;
-	$BB chown root:system /res/customconfig/actions/ -R;
+	$BB chown -R root:system /res/customconfig/actions/;
 	$BB chmod 6755 /res/customconfig/actions/*;
-	$BB chmod 6755 /res/customconfig/actions/push-actions/*;
 	$BB mv /res/customconfig/actions/push-actions/* /res/no-push-on-boot/;
+	$BB chmod 6755 /res/no-push-on-boot/*;
 
 	# set root access script.
 	$BB chmod 6755 /sbin/ext/cortexbrain-tune.sh;
@@ -136,32 +153,47 @@ echo "0" > /proc/sys/kernel/kptr_restrict;
 	$BB mv /res/no-push-on-boot/* /res/customconfig/actions/push-actions/;
 	pkill -f "com.gokhanmoral.stweaks.app";
 	$BB rm -f /data/.siyah/booting;
-	# ==============================================================
-	# STWEAKS FIXING
-	# ==============================================================
 
+	# Temp fix for sound bug at JB Sammy ROMS.
+	JB_ROM=`cat /tmp/jbsammy_installed`;
+	if [ "$JB_ROM" == "1" ]; then
+		$BB sh /res/uci.sh generic /sys/module/cpuidle_exynos4/parameters/enable_mask 1;
+		$BB sh /res/uci.sh generic_cortex /tmp/enable_mask_sleep 1;
+	fi;
+	echo "0" > /tmp/jbsammy_installed;
+
+	# change USB mode MTP or Mass Storage
+	$BB sh /res/uci.sh usb-mode ${usb_mode};
+)&
+
+(
+	# ###############################################################
+	# JB Low Sound Fix.
+	# ###############################################################
+
+	sleep 50;
 	# JB Sound Bug fix, 3 push VOL DOWN, 4 push VOL UP. and sound is fixed.
 	MIUI_JB=0;
 	JELLY=0;
-	[ "`/sbin/busybox grep -i cMIUI /system/build.prop`" ] && MIUI_JB=1;
+	[ "`$BB grep -i cMIUI /system/build.prop`" ] && MIUI_JB=1;
 	[ -f /system/lib/ssl/engines/libkeystore.so ] && JELLY=1;
 	if [ "$JELLY" == "1" ] || [ "$MIUI_JB" == "1" ]; then
 		if [ "$jb_sound_fix" == "on" ]; then
 			input keyevent 25
 			input keyevent 25
+			input keyevent 25
+			input keyevent 24
+			input keyevent 24
 			input keyevent 24
 			input keyevent 24
 		fi;
 	fi;
-
-	# change USB mode MTP or Mass Storage
-	/res/customconfig/actions/usb-mode ${usb_mode};
 )&
 
 (
 	while [ "`cat /proc/loadavg | cut -c1`" -ge "3" ]; do
 		echo "Waiting For CPU to cool down";
-		sleep 60;
+		sleep 30;
 	done;
 
 	PIDOFACORE=`pgrep -f "android.process.acore"`;

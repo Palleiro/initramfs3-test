@@ -1,6 +1,6 @@
 #!/sbin/busybox sh
 
-BB="/sbin/busybox";
+BB=/sbin/busybox
 
 extract_payload()
 {
@@ -22,37 +22,61 @@ $BB mount -t rootfs -o remount,rw rootfs;
 cd /;
 
 # copy cron files
-cp -a /res/crontab/ /data/
-rm -rf /data/crontab/cron/ > /dev/null 2>&1;
+$BB cp -a /res/crontab/ /data/
+$BB rm -rf /data/crontab/cron/ > /dev/null 2>&1;
 if [ ! -e /data/crontab/custom_jobs ]; then
-	touch /data/crontab/custom_jobs;
-	chmod 777 /data/crontab/custom_jobs;
+	$BB touch /data/crontab/custom_jobs;
+	$BB chmod 777 /data/crontab/custom_jobs;
+fi;
+
+# check if new SuperSU exist in kernel, and if Superuser installed, then replace with new SuperSu.
+NEW_SU=0;
+if [ -e /system/app/SuperSU.apk ]; then
+	su_app_md5sum=`$BB md5sum /system/app/SuperSU.apk | $BB awk '{print $1}'`
+	su_app_md5sum_kernel=`cat /res/SuperSU_md5`;
+	if [ "$su_app_md5sum" != "$su_app_md5sum_kernel" ]; then
+		NEW_SU=1;
+	else
+		NEW_SU=0;
+	fi;
+fi;
+
+if [ -e /system/app/Superuser.apk ]; then
+	NEW_SU=1;
 fi;
 
 if [ "$install_root" == "on" ]; then
-	if [ -e /system/xbin/su ]; then
-		echo "Superuser already exists";
+	if [ -e /system/xbin/su ] && [ "$NEW_SU" == "0" ]; then
+		echo "SuperSU already exists and updated";
 	else
 		# clean su traces
 		$BB rm -f /system/bin/su > /dev/null 2>&1;
 		$BB rm -f /system/xbin/su > /dev/null 2>&1;
+		$BB rm -f /system/bin/.ext/su > /dev/null 2>&1;
 		$BB mkdir /system/xbin > /dev/null 2>&1;
 		$BB chmod 755 /system/xbin;
 
 		# extract SU binary
+		if [ ! -d /system/bin/.ext ]; then
+			$BB mkdir /system/bin/.ext;
+			$BB chmod 777 /system/bin/.ext;
+		fi;
+		$BB cp -a /res/misc/payload/su /system/bin/.ext/su;
 		$BB cp -a /res/misc/payload/su /system/xbin/su;
 		$BB chown 0.0 /system/xbin/su;
 		$BB chmod 6755 /system/xbin/su;
+		$BB chown 0.0 /system/bin/.ext/su;
+		$BB chmod 6755 /system/bin/.ext/su;
 
 		# clean super user old apps
 		$BB rm -f /system/app/*uper?ser.apk > /dev/null 2>&1;
 		$BB rm -f /system/app/?uper?u.apk > /dev/null 2>&1;
-		$BB rm -f /system/app/*chainfire?supersu*.apk > /dev/null 2>&1;
+		$BB rm -f /system/app/*chainfire?supersu.apk > /dev/null 2>&1;
 		$BB rm -f /data/app/*uper?ser.apk > /dev/null 2>&1;
 		$BB rm -f /data/app/?uper?u.apk > /dev/null 2>&1;
-		$BB rm -f /data/app/*chainfire?supersu*.apk > /dev/null 2>&1;
+		$BB rm -f /data/app/*chainfire?supersu.apk > /dev/null 2>&1;
 		$BB rm -f /data/dalvik-cache/*uper?ser.apk* > /dev/null 2>&1;
-		$BB rm -f /data/dalvik-cache/*chainfire?supersu*.apk* > /dev/null 2>&1;
+		$BB rm -f /data/dalvik-cache/*chainfire?supersu.apk* > /dev/null 2>&1;
 		$BB rm -rf /data/data/com.noshufou.android.su > /dev/null 2>&1;
 		$BB rm -rf /data/data/eu.chinfire.supersu > /dev/null 2>&1;
 
@@ -60,6 +84,15 @@ if [ "$install_root" == "on" ]; then
 		$BB cp -a /res/misc/payload/SuperSU.apk /system/app/SuperSU.apk;
 		$BB chown 0.0 /system/app/SuperSU.apk;
 		$BB chmod 644 /system/app/SuperSU.apk;
+
+		if [ ! -e /data/app/*chainfire?supersu.pr*.apk ]; then
+			if [ -e /data/system/chain_pro.apk_bkp ]; then
+				mv /data/system/chain_pro.apk_bkp /system/app/eu.chainfire.supersu.pro-1.apk;
+				chmod 644 /system/app/eu.chainfire.supersu.pro-1.apk;
+		else
+				echo "no su pro" > /dev/null 2>&1;
+			fi;
+		fi;
 
 		# restore witch if exist
 		if [ -e /system/xbin/waswhich-bkp ]; then
@@ -83,14 +116,14 @@ if [ "$install_root" == "on" ]; then
 fi;
 
 if [ ! -e /system/app/CWMManager.apk ]; then
-	rm -f /data/app/CWMManager.apk > /dev/null 2>&1;
-	rm -f /data/dalvik-cache/*CWMManager.apk* > /dev/null 2>&1;
-	rm -f /data/app/eu.chainfire.cfroot.cwmmanager*.apk > /dev/null 2>&1;
-	rm -rf /data/data/eu.chainfire.cfroot.cwmmanage* > /dev/null 2>&1;
+	$BB rm -f /data/app/CWMManager.apk > /dev/null 2>&1;
+	$BB rm -f /data/dalvik-cache/*CWMManager.apk* > /dev/null 2>&1;
+	$BB rm -f /data/app/eu.chainfire.cfroot.cwmmanager*.apk > /dev/null 2>&1;
+	$BB rm -rf /data/data/eu.chainfire.cfroot.cwmmanage* > /dev/null 2>&1;
 
-	cp -a /res/misc/payload/CWMManager.apk /system/app/CWMManager.apk;
-	chown 0.0 /system/app/CWMManager.apk;
-	chmod 644 /system/app/CWMManager.apk;
+	$BB cp -a /res/misc/payload/CWMManager.apk /system/app/CWMManager.apk;
+	$BB chown 0.0 /system/app/CWMManager.apk;
+	$BB chmod 644 /system/app/CWMManager.apk;
 fi;
 
 # liblights install by force to allow BLN
@@ -111,21 +144,21 @@ GMTWEAKS()
 {
 
 	if [ -f /system/app/STweaks.apk ]; then
-		stmd5sum=`/sbin/busybox md5sum /system/app/STweaks.apk | /sbin/busybox awk '{print $1}'`
+		stmd5sum=`$BB md5sum /system/app/STweaks.apk | $BB awk '{print $1}'`
 		stmd5sum_kernel=`cat /res/stweaks_md5`;
 		if [ "$stmd5sum" != "$stmd5sum_kernel" ]; then
-			rm -f /system/app/STweaks.apk > /dev/null 2>&1;
-			rm -f /data/app/com.gokhanmoral.*weaks*.apk > /dev/null 2>&1;
-			rm -f /data/dalvik-cache/*gokhanmoral.*weak*.apk* > /dev/null 2>&1;
-			rm -f /cache/dalvik-cache/*gokhanmoral.*weak*.apk* > /dev/null 2>&1;
+			$BB rm -f /system/app/STweaks.apk > /dev/null 2>&1;
+			$BB rm -f /data/app/com.gokhanmoral.*weaks*.apk > /dev/null 2>&1;
+			$BB rm -f /data/dalvik-cache/*gokhanmoral.*weak*.apk* > /dev/null 2>&1;
+			$BB rm -f /cache/dalvik-cache/*gokhanmoral.*weak*.apk* > /dev/null 2>&1;
 		fi;
 	fi;
 
 	if [ ! -f /system/app/STweaks.apk ]; then
-		rm -f /data/app/com.gokhanmoral.*weak*.apk > /dev/null 2>&1;
-		rm -rf /data/data/com.gokhanmoral.*weak* > /dev/null 2>&1;
-		rm -f /data/dalvik-cache/*gokhanmoral.*weak*.apk* > /dev/null 2>&1;
-		rm -f /cache/dalvik-cache/*gokhanmoral.*weak*.apk* > /dev/null 2>&1;
+		$BB rm -f /data/app/com.gokhanmoral.*weak*.apk > /dev/null 2>&1;
+		$BB rm -rf /data/data/com.gokhanmoral.*weak* > /dev/null 2>&1;
+		$BB rm -f /data/dalvik-cache/*gokhanmoral.*weak*.apk* > /dev/null 2>&1;
+		$BB rm -f /cache/dalvik-cache/*gokhanmoral.*weak*.apk* > /dev/null 2>&1;
 		$BB cp -a /res/misc/payload/STweaks.apk /system/app/STweaks.apk;
 		$BB chown 0.0 /system/app/STweaks.apk;
 		$BB chmod 644 /system/app/STweaks.apk;
@@ -136,10 +169,10 @@ GMTWEAKS;
 EXTWEAKS_CLEAN()
 {
 	if [ -f /system/app/Extweaks.apk ] || [ -f /data/app/com.darekxan.extweaks.ap*.apk ]; then
-		rm -f /system/app/Extweaks.apk > /dev/null 2>&1;
-		rm -f /data/app/com.darekxan.extweaks.ap*.apk > /dev/null 2>&1;
-		rm -rf /data/data/com.darekxan.extweaks.app > /dev/null 2>&1;
-		rm -f /data/dalvik-cache/*com.darekxan.extweaks.app* > /dev/null 2>&1;
+		$BB rm -f /system/app/Extweaks.apk > /dev/null 2>&1;
+		$BB rm -f /data/app/com.darekxan.extweaks.ap*.apk > /dev/null 2>&1;
+		$BB rm -rf /data/data/com.darekxan.extweaks.app > /dev/null 2>&1;
+		$BB rm -f /data/dalvik-cache/*com.darekxan.extweaks.app* > /dev/null 2>&1;
 	fi;
 }
 EXTWEAKS_CLEAN;

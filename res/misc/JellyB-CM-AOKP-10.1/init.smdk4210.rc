@@ -39,11 +39,15 @@ on fs
     mount ext4 /res/dev/system /system noatime wait
 
 # mount the rest.
+    exec sfsck /res/dev/cache ext4
     mount ext4 /res/dev/cache /cache nosuid nodev noatime wait
+    exec sfsck /res/dev/data ext4
     mount ext4 /res/dev/data /data nosuid nodev noatime wait noauto_da_alloc
+    exec sfsck /dev/block/mmcblk0p12 ext4
     mount ext4 /dev/block/mmcblk0p12 /preload nosuid nodev noatime wait
-
+    exec sfsck /dev/block/mmcblk0p1 ext4
     mount ext4 /dev/block/mmcblk0p1 /efs nosuid nodev noatime wait
+
     mkdir /efs/bluetooth
     mkdir /efs/wifi
     chown radio system /efs/bluetooth
@@ -53,7 +57,7 @@ on fs
 
     mkdir /data/misc/vpn/profiles 0770 system system
     mkdir /data/misc/radio 0775 radio system
-    chmod 0770 /data/misc/wifi 
+    chmod 0774 /data/misc/wifi
 
 on post-fs-data
 # MDNS
@@ -70,10 +74,10 @@ on post-fs-data
     chown system system /data/gps
 
 # give system access to wpa_supplicant.conf for backup and restore
-    mkdir /data/misc/wifi 0770 wifi wifi
-    chmod 0770 /data/misc/wifi
-    chmod 0660 /data/misc/wifi/wpa_supplicant.conf
-    mkdir /data/misc/wifi/sockets 0770 wifi wifi
+    mkdir /data/misc/wifi 0774 wifi wifi
+    chmod 0774 /data/misc/wifi
+    chmod 0664 /data/misc/wifi/wpa_supplicant.conf
+    mkdir /data/misc/wifi/sockets 0774 wifi wifi
     mkdir /data/misc/dhcp 0770 dhcp dhcp
     chown dhcp dhcp /data/misc/dhcp
 
@@ -304,8 +308,6 @@ on post-fs-data
     setprop vold.post_fs_data_done 1
 
 on boot
-    mount debugfs /sys/kernel/debug /sys/kernel/debug
-
     setprop ro.radio.noril yes
 
 # permissions for NFC
@@ -343,10 +345,10 @@ service p2p_supplicant /system/bin/wpa_supplicant \
 
 service wpa_supplicant /system/bin/wpa_supplicant \
 	-Dnl80211 -iwlan0 -puse_p2p_group_interface=1 -c/data/misc/wifi/wpa_supplicant.conf -e/data/misc/wifi/entropy.bin
-# we will start as root and wpa_supplicant will switch to user wifi
-# after setting up the capabilities required for WEXT
-# user wifi
-# group wifi inet keystore
+#       we will start as root and wpa_supplicant will switch to user wifi
+#       after setting up the capabilities required for WEXT
+#       user wifi
+#       group wifi inet keystore
 	class main
 	socket wpa_wlan0 dgram 0660 wifi wifi
 	disabled
@@ -381,6 +383,6 @@ service bdaddr /system/bin/bdaddr_read
 
 # TVout
 service TvoutService_C /system/bin/bintvoutservice
-     class main
-     user system
-     group graphics
+    class main
+    user system
+    group graphics
